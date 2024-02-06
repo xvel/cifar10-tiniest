@@ -13,7 +13,7 @@ from model import Tinier
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 learning_rate = 0.01
-num_epochs = 5
+num_epochs = 500
 batch_size = 256
 
 losses = []
@@ -101,6 +101,5 @@ for epoch in range(num_epochs):
         losses.append(loss.item())
     
     test_acc.append(testacc(model, test_loader))
-    print(test_acc[-1])
 
 print('Finished Training, test set accuracy:', test_acc[-1], ' train set accuracy:', testacc(model, train_loader))
