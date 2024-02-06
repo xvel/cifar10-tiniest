@@ -2,3 +2,6 @@
 
 ## Performance
 
+## Architecture
+
+![network architecture](arch.png)
