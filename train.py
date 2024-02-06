@@ -72,7 +72,7 @@ def testacc(model, set):
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-            
+    
     return (100 * correct / total)
 
 
@@ -85,7 +85,7 @@ for epoch in range(num_epochs):
         inputs, labels = inputs.to(device), labels.to(device)
         
         inputs = transform(inputs)
-
+        
         inputs, labels = mixup(inputs, labels)
         
         inputs = inputs-0.5
@@ -93,7 +93,7 @@ for epoch in range(num_epochs):
         outputs = model(inputs)
         
         loss = loss_mixup(labels, outputs)
-            
+        
         loss.backward()
         optimizer.step()
         scheduler.step()
