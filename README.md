@@ -1,7 +1,7 @@
-# A Tinier Convolutional Network for CIFAR-10 Dataset with Human-Level Performance
+# Tiniest Convolutional Network for CIFAR-10 Dataset with human-level performance
 
 ## Performance
 
 ## Architecture
 
-![network architecture](arch.png)
+![network architecture](archl.png)
