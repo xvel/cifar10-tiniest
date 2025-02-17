@@ -7,18 +7,16 @@ from torchvision.datasets import CIFAR10
 from torch import nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import OneCycleLR
-from model import Tinier
+from model import Tiniest
+from ema import EMA
+from tqdm import tqdm
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-learning_rate = 0.01
-num_epochs = 500
+learning_rate = 0.02
+num_epochs = 200
 batch_size = 256
-
-losses = []
-test_acc = []
-
 
 transform = nn.Sequential(
     K.RandomHorizontalFlip(),
@@ -28,17 +26,16 @@ transform = nn.Sequential(
     K.ColorJiggle(0.1, 0.1, 0.5, 0.05, p=0.9)
 )
 
-mixup = K.RandomMixUpV2(lambda_val=(0, 0.5), data_keys=["input", "class"])
-
-
 train_dataset = CIFAR10(root='./data', train=True, download=False, transform=transforms.ToTensor())
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 
 test_dataset = CIFAR10(root='./data', train=False, download=False, transform=transforms.ToTensor())
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-model = Tinier().to(device)
+model = Tiniest().to(device)
+print("Parameter count:", sum(p.numel() for p in model.parameters()))
 
+ema = EMA(model, decay=0.999)
 
 def loss_mixup(y, logits):
     criterion = F.cross_entropy
@@ -46,21 +43,46 @@ def loss_mixup(y, logits):
     loss_b = criterion(logits, y[:, 1].long(), reduction='none')
     return ((1 - y[:, 2]) * loss_a + y[:, 2] * loss_b).mean()
 
-
 optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
-scheduler = OneCycleLR(optimizer, 
-                       max_lr=learning_rate, 
-                       epochs=num_epochs, 
-                       steps_per_epoch=len(train_loader), 
-                       pct_start=0.05, 
-                       anneal_strategy='linear', 
-                       cycle_momentum=False, 
-                       three_phase=False)
+scheduler = OneCycleLR(optimizer,
+                       max_lr=learning_rate,
+                       epochs=num_epochs,
+                       steps_per_epoch=len(train_loader),
+                       pct_start=0.01,
+                       anneal_strategy='cos',
+                       cycle_momentum=False,
+                       final_div_factor=0.4)
+
+
+for epoch in tqdm(range(num_epochs), desc="Epochs", unit="epoch"):
+    model.train()
+    
+    mixup = K.RandomMixUpV2(lambda_val=(0, min((epoch/num_epochs), 0.5)), data_keys=["input", "class"])
+    
+    for i, data in enumerate(train_loader, 0):
+        model.train()
+        inputs, labels = data
+        inputs, labels = inputs.to(device), labels.to(device)
+        
+        inputs = transform(inputs)
+        inputs, labels = mixup(inputs, labels)
+        
+        optimizer.zero_grad()
+        outputs = model(inputs-0.5)
+        
+        loss = loss_mixup(labels, outputs)
+        
+        loss.backward()
+        optimizer.step()
+        scheduler.step()
+        ema.update()
 
 
 def testacc(model, set):
     correct = 0
     total = 0
+    
+    ema.apply_shadow()
     model.eval()
     
     with torch.no_grad():        
@@ -73,33 +95,10 @@ def testacc(model, set):
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
     
+    ema.restore()
     return (100 * correct / total)
 
 
-for epoch in range(num_epochs):
-    running_loss = 0.0
-    model.train()
-    for i, data in enumerate(train_loader, 0):
-        model.train()
-        inputs, labels = data
-        inputs, labels = inputs.to(device), labels.to(device)
-        
-        inputs = transform(inputs)
-        
-        inputs, labels = mixup(inputs, labels)
-        
-        inputs = inputs-0.5
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        
-        loss = loss_mixup(labels, outputs)
-        
-        loss.backward()
-        optimizer.step()
-        scheduler.step()
-        
-        losses.append(loss.item())
-    
-    test_acc.append(testacc(model, test_loader))
-
-print('Finished Training, test set accuracy:', test_acc[-1], ' train set accuracy:', testacc(model, train_loader))
+print("Finished Training")
+print(f"Test set accuracy: {testacc(model, test_loader):.2f}%")
+print(f"Training set accuracy: {testacc(model, train_loader):.2f}%")
