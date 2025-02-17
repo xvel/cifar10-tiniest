@@ -26,10 +26,10 @@ transform = nn.Sequential(
     K.ColorJiggle(0.1, 0.1, 0.5, 0.05, p=0.9)
 )
 
-train_dataset = CIFAR10(root='./data', train=True, download=False, transform=transforms.ToTensor())
+train_dataset = CIFAR10(root='./data', train=True, download=True, transform=transforms.ToTensor())
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 
-test_dataset = CIFAR10(root='./data', train=False, download=False, transform=transforms.ToTensor())
+test_dataset = CIFAR10(root='./data', train=False, download=True, transform=transforms.ToTensor())
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 model = Tiniest().to(device)
