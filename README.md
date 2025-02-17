@@ -21,3 +21,4 @@ random color jiggle
 mixup with linearly increasing intensity for the first 100 epochs  
 
 Code is minimal and self-explanatory
+There is still room for improvement
